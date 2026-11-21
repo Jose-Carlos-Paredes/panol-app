@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pañol-App | Trazabilidad de Tablets</title>
+    <!-- Librería de Escáner QR -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- Librería para Generar QRs en el Alta (CU-01) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-light: #2563eb;
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --green: #16a34a;
+            --green-bg: #dcfce7;
+            --blue: #0284c7;
+            --blue-bg: #e0f2fe;
+            --amber: #d97706;
+            --amber-bg: #fef3c7;
+            --red: #dc2626;
+            --red-bg: #fee2e2;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            padding-bottom: 30px;
+        }
+
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        header h1 { margin: 0; font-size: 20px; letter-spacing: 0.5px; }
+        header p { margin: 4px 0 0; font-size: 12px; opacity: 0.85; }
+
+        /* Navegación superior */
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid #cbd5e1;
+            position: sticky;
+            top: 66px;
+            z-index: 99;
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 12px 6px;
+            border: none;
+            background: transparent;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        .nav-btn.activo {
+            color: var(--primary-light);
+            border-bottom-color: var(--primary-light);
+            background: #f8fafc;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 15px auto;
+            padding: 0 12px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        h2 { margin: 0 0 12px; font-size: 17px; color: var(--primary); }
+        h3 { margin: 0 0 10px; font-size: 15px; }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            color: #334155;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 11px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 15px;
+            background: #fff;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 10px;
+            color: white;
+            transition: opacity 0.2s;
+        }
+        .btn:active { opacity: 0.85; }
+        .btn-primary { background: var(--primary-light); }
+        .btn-success { background: var(--green); }
+        .btn-warning { background: var(--amber); }
+        .btn-danger { background: var(--red); }
+        .btn-secondary { background: #475569; }
+        .btn-outline {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .oculto { display: none !important; }
+
+        /* Escáner */
+        #reader {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Toast de notificaciones */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 999;
+            display: none;
+            max-width: 90%;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+
+        /* Badges de los 4 estados exclusivos */
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .st-panol { background: var(--green-bg); color: var(--green); }
+        .st-local { background: var(--blue-bg); color: var(--blue); }
+        .st-externo { background: var(--amber-bg); color: var(--amber); }
+        .st-tecnico { background: var(--red-bg); color: var(--red); }
+
+        /* Ficha técnica */
+        .ficha-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .ficha-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .ficha-item.full { grid-column: span 2; }
+        .ficha-label { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+        .ficha-valor { font-size: 14px; font-weight: 600; margin-top: 2px; word-break: break-word; }
+
+        /* Alerta visual obligatoria (Home Office sin tarea) */
+        .alerta-roja {
+            background: var(--red-bg);
+            border: 2px solid var(--red);
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        /* Checkbox físico */
+        .check-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+        }
+        .check-box input { width: 20px; height: 20px; margin: 0; }
+        .check-box label { margin: 0; color: #9f1239; font-size: 14px; }
+
+        /* Contenedor QR generado */
+        #qrGeneradoBox {
+            text-align: center;
+            margin-top: 15px;
+            padding: 15px;
+            border: 2px dashed #94a3b8;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 12px 0;
+        }
+        .json-preview {
+            font-family: monospace;
+            font-size: 11px;
+            background: #e2e8f0;
+            padding: 8px;
+            border-radius: 6px;
+            word-break: break-all;
+            text-align: left;
+        }
+
+        /* Lista de inventario */
+        .inv-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            background: #fff;
+        }
+        .inv-item:hover { background: #f8fafc; }
+        .inv-top { display: flex; justify-content: space-between; align-items: center; }
+        .inv-meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    </style>
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e3a8a">
+</head>
+<body>
+
+<header>
+    <h1>📱 Pañol-App</h1>
+    <p>Gestión y Trazabilidad de Tablets Corporativas</p>
+</header>
+
+<div class="nav-tabs">
+    <button class="nav-btn activo" id="tab-escaner" onclick="cambiarVista('escaner')">📷 Escanear</button>
+    <button class="nav-btn" id="tab-alta" onclick="cambiarVista('alta')">➕ Alta (CU-01)</button>
+    <button class="nav-btn" id="tab-inventario" onclick="cambiarVista('inventario')">📋 Inventario</button>
+</div>
+
+<div class="container">
+
+    <!-- ========================================== -->
+    <!-- VISTA 1: ESCANEO, FICHA TÉCNICA Y ESTADOS  -->
+    <!-- ========================================== -->
+    <div id="vista-escaner">
+        <div class="card">
+            <button class="btn btn-primary" id="btnAbrirCamara" onclick="iniciarEscaneo()">📷 Escanear QR de Tablet</button>
+            <button class="btn btn-danger oculto" id="btnCerrarCamara" onclick="detenerEscaneo()">✖ Detener Cámara</button>
+            <div id="reader"></div>
+
+            <label for="inputSerieManual">¿QR dañado? Ingresar N° de Serie manual:</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="inputSerieManual" placeholder="Ej: TB-001">
+                <button class="btn btn-secondary" style="width: auto; margin-top: 0; padding: 0 18px;" onclick="buscarManual()">Buscar</button>
+            </div>
+            <button class="btn btn-outline" style="margin-top: 10px; padding: 9px; font-size: 13px;" onclick="sincronizarBD(true)">🔄 Sincronizar Base de Datos</button>
+        </div>
+
+        <!-- FICHA TÉCNICA DE LA TABLET ESCANEADA / BUSCADA -->
+        <div id="panelFicha" class="card oculto">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <h2 style="margin: 0;" id="fichaSerie">TB-001</h2>
+                <span id="fichaBadge" class="badge st-panol">En Pañol</span>
+            </div>
+
+            <div class="ficha-grid">
+                <div class="ficha-item">
+                    <div class="ficha-label">Procesador</div>
+                    <div class="ficha-valor" id="fichaCpu">-</div>
+                </div>
+                <div class="ficha-item">
+                    <div class="ficha-label">RAM / Almac.</div>
+                    <div class="ficha-valor" id="fichaRam">-</div>
+                </div>
+                <div class="ficha-item">
+                    <div class="ficha-label">Pantalla</div>
+                    <div class="ficha-valor" id="fichaPantalla">-</div>
+                </div>
+                <div class="ficha-item">
+                    <div class="ficha-label">Puertos</div>
+                    <div class="ficha-valor" id="fichaPuertos">-</div>
+                </div>
+                <div class="ficha-item full">
+                    <div class="ficha-label">Conectividad</div>
+                    <div class="ficha-valor" id="fichaConectividad">-</div>
+                </div>
+            </div>
+
+            <!-- Datos del préstamo actual (si está prestada) -->
+            <div id="infoPrestamoActual" class="oculto" style="margin-top: 12px; padding: 10px; background: #f1f5f9; border-radius: 8px; font-size: 14px;">
+                <strong>👤 Legajo asignado:</strong> <span id="fichaLegajo">-</span><br>
+                <strong>📝 Tarea:</strong> <span id="fichaTarea">-</span>
+            </div>
+
+            <!-- Si se escaneó un QR válido pero la tablet NO está en Sheets todavía -->
+            <div id="bloqueNoRegistrada" class="oculto" style="margin-top: 14px;">
+                <div class="alerta-roja" style="background: #fef3c7; border-color: #d97706; color: #92400e;">
+                    ⚠️ Esta tablet no figura en el inventario del Pañol.
+                </div>
+                <button class="btn btn-success" onclick="altaRapidaDesdeQR()">➕ Registrar esta Tablet en Pañol ahora</button>
+            </div>
+
+            <!-- CU-02: DESPACHAR TABLET (Solo si está En Pañol) -->
+            <div id="bloqueDespacho" class="oculto" style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                <h3>📤 CU-02: Despachar Tablet</h3>
+                <label for="despachoLegajo">Legajo del Empleado *</label>
+                <input type="text" id="despachoLegajo" placeholder="Ej: LEG-4520">
+
+                <label for="despachoDestino">Modalidad de Uso *</label>
+                <select id="despachoDestino" onchange="verificarModalidad()">
+                    <option value="En Uso Local (Oficina)">En Uso Local (Oficina)</option>
+                    <option value="En Uso Externo (Home Office)">En Uso Externo (Home Office)</option>
+                </select>
+
+                <label for="despachoTarea">Tarea Asignada <span id="labelObligatorio" class="oculto" style="color: var(--red);">(OBLIGATORIA para Home Office)</span></label>
+                <textarea id="despachoTarea" rows="2" placeholder="Describa la tarea asociada..."></textarea>
+
+                <!-- ALERTA VISUAL OBLIGATORIA -->
+                <div id="alertaHomeOffice" class="alerta-roja oculto">
+                    🚨 BLOQUEO DE SEGURIDAD: No se puede autorizar un retiro para "Home Office" sin una tarea asignada que lo justifique.
+                </div>
+
+                <button class="btn btn-primary" onclick="confirmarDespacho()">✅ Confirmar Despacho</button>
+            </div>
+
+            <!-- CU-03: RECIBIR DEVOLUCIÓN (Solo si está en Uso Local o Externo) -->
+            <div id="bloqueDevolucion" class="oculto" style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                <h3>📥 CU-03: Recibir Devolución</h3>
+                <div class="check-box">
+                    <input type="checkbox" id="checkDanada" onchange="toggleObservacion()">
+                    <label for="checkDanada">El equipo presenta rotura física o falla (Derivar a Servicio Técnico)</label>
+                </div>
+
+                <div id="campoObservacion" class="oculto">
+                    <label for="devolucionObs">Detalle de la falla / rotura:</label>
+                    <input type="text" id="devolucionObs" placeholder="Ej: Pantalla astillada / No carga">
+                </div>
+
+                <button class="btn btn-success" onclick="confirmarDevolucion()">✅ Confirmar Devolución</button>
+            </div>
+
+            <!-- EXTRA: REHABILITAR DESDE SERVICIO TÉCNICO -->
+            <div id="bloqueServicioTecnico" class="oculto" style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                <div class="alerta-roja">
+                    🛠️ Equipo fuera de circulación (En Servicio Técnico).
+                </div>
+                <button class="btn btn-warning" onclick="rehabilitarTablet()">🔧 Marcar como Reparada (Volver a Pañol)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VISTA 2: CU-01 ALTA DE TABLET Y QR         -->
+    <!-- ========================================== -->
+    <div id="vista-alta" class="oculto">
+        <div class="card">
+            <h2>➕ CU-01: Alta de Tablet en Pañol</h2>
+            <label for="altaSerie">Número de Serie *</label>
+            <input type="text" id="altaSerie" placeholder="Ej: TB-004">
+
+            <label for="altaCpu">Procesador *</label>
+            <input type="text" id="altaCpu" placeholder="Ej: Snapdragon 680">
+
+            <label for="altaRam">RAM / Almacenamiento *</label>
+            <input type="text" id="altaRam" placeholder="Ej: 4GB / 64GB">
+
+            <label for="altaPantalla">Tamaño de Pantalla *</label>
+            <input type="text" id="altaPantalla" placeholder="Ej: 10.4 pulgadas">
+
+            <label for="altaPuertos">Puertos *</label>
+            <input type="text" id="altaPuertos" placeholder="Ej: 1x USB-C, 1x Jack 3.5mm">
+
+            <label for="altaConectividad">Conectividad *</label>
+            <input type="text" id="altaConectividad" placeholder="Ej: Wi-Fi 5, 4G, Bluetooth 5.1">
+
+            <button class="btn btn-success" onclick="registrarAlta()">💾 Registrar en Pañol y Generar QR</button>
+
+            <div id="qrGeneradoBox" class="oculto">
+                <h3>🏷️ Etiqueta QR Generada</h3>
+                <div id="qrcode"></div>
+                <div class="json-preview" id="jsonPreview"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VISTA 3: INVENTARIO COMPLETO               -->
+    <!-- ========================================== -->
+    <div id="vista-inventario" class="oculto">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 style="margin: 0;">📋 Inventario Actual</h2>
+                <button class="btn btn-outline" style="width: auto; margin: 0; padding: 6px 12px; font-size: 12px;" onclick="sincronizarBD(true)">🔄 Actualizar</button>
+            </div>
+            <div id="listaInventario">Cargando inventario...</div>
+        </div>
+    </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+    // URL DE TU GOOGLE APPS SCRIPT
+    const API_URL = "https://script.google.com/macros/s/AKfycbxm2GoYgLfXhQxXxD7pD77gbwUHqbNt7pacTCKWd4B4YTNNBMkN48pPU4UoJ72qMXaImA/exec";
+
+    let inventarioLocal = JSON.parse(localStorage.getItem('panolTabletsDB')) || {};
+    let tabletActual = null;
+    let html5QrcodeScanner = null;
+
+    // Al iniciar la app, sincronizamos automáticamente con Google Sheets
+    window.addEventListener('DOMContentLoaded', () => {
+        sincronizarBD(false);
+    });
+
+    // --- UTILIDADES ---
+    function mostrarToast(msg, color = "#1e293b") {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.backgroundColor = color;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    function cambiarVista(vista) {
+        detenerEscaneo();
+        ['escaner', 'alta', 'inventario'].forEach(v => {
+            document.getElementById('vista-' + v).classList.add('oculto');
+            document.getElementById('tab-' + v).classList.remove('activo');
+        });
+        document.getElementById('vista-' + vista).classList.remove('oculto');
+        document.getElementById('tab-' + vista).classList.add('activo');
+
+        if (vista === 'inventario') renderizarInventario();
+    }
+
+    function obtenerClaseEstado(estado) {
+        if (estado === "En Pañol") return "st-panol";
+        if (estado.includes("Local")) return "st-local";
+        if (estado.includes("Externo")) return "st-externo";
+        return "st-tecnico";
+    }
+
+    // --- CONEXIÓN CON GOOGLE APPS SCRIPT ---
+    async function sincronizarBD(notificar = true) {
+        if (notificar) mostrarToast("Sincronizando con Google Sheets...", "#0284c7");
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            if (data.ok) {
+                inventarioLocal = data.tablets || {};
+                localStorage.setItem('panolTabletsDB', JSON.stringify(inventarioLocal));
+                if (notificar) mostrarToast("✓ Base de datos actualizada.", "#16a34a");
+                renderizarInventario();
+            } else {
+                mostrarToast("⚠ " + data.error, "#dc2626");
+            }
+        } catch (err) {
+            console.error(err);
+            if (notificar) mostrarToast("⚠ Sin conexión. Usando datos locales.", "#d97706");
+        }
+    }
+
+    async function enviarAccion(payload) {
+        mostrarToast("Guardando cambios...", "#0284c7");
+        try {
+            // Usamos text/plain para evitar bloqueos CORS con Google Apps Script
+            const res = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.ok) {
+                mostrarToast("✓ " + data.mensaje, "#16a34a");
+                await sincronizarBD(false);
+                return true;
+            } else {
+                mostrarToast("⚠ " + data.error, "#dc2626");
+                return false;
+            }
+        } catch (err) {
+            console.error(err);
+            mostrarToast("⚠ Error de red al guardar en Sheets.", "#dc2626");
+            return false;
+        }
+    }
+
+    // --- SPRINT 1: ESCÁNER QR CON CÁMARA REAL ---
+    function iniciarEscaneo() {
+        const readerDiv = document.getElementById('reader');
+        readerDiv.style.display = 'block';
+        document.getElementById('btnAbrirCamara').classList.add('oculto');
+        document.getElementById('btnCerrarCamara').classList.remove('oculto');
+
+        html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 240, height: 240 } },
+            (textoQR) => {
+                detenerEscaneo();
+                procesarLecturaQR(textoQR);
+            },
+            () => {}
+        ).catch(err => {
+            detenerEscaneo();
+            mostrarToast("⚠ No se pudo acceder a la cámara. Revisá los permisos.", "#dc2626");
+        });
+    }
+
+    function detenerEscaneo() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => {
+                html5QrcodeScanner.clear();
+                html5QrcodeScanner = null;
+            }).catch(() => {});
+        }
+        document.getElementById('reader').style.display = 'none';
+        document.getElementById('btnAbrirCamara').classList.remove('oculto');
+        document.getElementById('btnCerrarCamara').classList.add('oculto');
+    }
+
+    function procesarLecturaQR(texto) {
+        try {
+            // Intentamos decodificar el JSON del QR
+            const datosQR = JSON.parse(texto);
+            if (!datosQR.serie) throw new Error("JSON sin serie");
+
+            const serie = String(datosQR.serie).trim();
+            document.getElementById('inputSerieManual').value = serie;
+
+            if (inventarioLocal[serie]) {
+                mostrarFicha(inventarioLocal[serie], true);
+                mostrarToast("✓ QR leído y validado en Pañol.", "#16a34a");
+            } else {
+                // La tablet tiene QR válido pero aún no está registrada en Sheets
+                mostrarFicha({
+                    serie: serie,
+                    cpu: datosQR.cpu || "-",
+                    ram_storage: datosQR.ram_storage || "-",
+                    pantalla: datosQR.pantalla || "-",
+                    puertos: datosQR.puertos || "-",
+                    conectividad: datosQR.conectividad || "-",
+                    estado: "No Registrada",
+                    legajo: "",
+                    tarea: ""
+                }, false);
+            }
+        } catch (e) {
+            // Si el QR contenía solo texto plano (ej: "TB-001")
+            document.getElementById('inputSerieManual').value = texto.trim();
+            buscarManual();
+        }
+    }
+
+    // Flujo alternativo: Ingreso manual por teclado (si el QR está dañado)
+    function buscarManual() {
+        const serie = document.getElementById('inputSerieManual').value.trim();
+        if (!serie) {
+            mostrarToast("Ingresá un Número de Serie.", "#dc2626");
+            return;
+        }
+
+        // Búsqueda insensible a mayúsculas
+        const claveEncontrada = Object.keys(inventarioLocal).find(
+            k => k.toLowerCase() === serie.toLowerCase()
+        );
+
+        if (claveEncontrada) {
+            mostrarFicha(inventarioLocal[claveEncontrada], true);
+        } else {
+            document.getElementById('panelFicha').classList.add('oculto');
+            mostrarToast("⚠ Tablet '" + serie + "' no encontrada. Podés darla de alta en CU-01.", "#d97706");
+        }
+    }
+
+    // --- MOSTRAR FICHA TÉCNICA Y ACCIONES SEGÚN ESTADO ---
+    function mostrarFicha(tablet, existeEnBD) {
+        tabletActual = tablet;
+        document.getElementById('panelFicha').classList.remove('oculto');
+
+        document.getElementById('fichaSerie').innerText = tablet.serie;
+        document.getElementById('fichaCpu').innerText = tablet.cpu;
+        document.getElementById('fichaRam').innerText = tablet.ram_storage;
+        document.getElementById('fichaPantalla').innerText = tablet.pantalla;
+        document.getElementById('fichaPuertos').innerText = tablet.puertos;
+        document.getElementById('fichaConectividad').innerText = tablet.conectividad;
+
+        const badge = document.getElementById('fichaBadge');
+        badge.innerText = tablet.estado;
+        badge.className = "badge " + (existeEnBD ? obtenerClaseEstado(tablet.estado) : "st-externo");
+
+        // Ocultar todos los bloques de acción primero
+        ['infoPrestamoActual', 'bloqueNoRegistrada', 'bloqueDespacho', 'bloqueDevolucion', 'bloqueServicioTecnico']
+            .forEach(id => document.getElementById(id).classList.add('oculto'));
+
+        // Resetear inputs
+        document.getElementById('despachoLegajo').value = "";
+        document.getElementById('despachoTarea').value = "";
+        document.getElementById('despachoDestino').value = "En Uso Local (Oficina)";
+        document.getElementById('alertaHomeOffice').classList.add('oculto');
+        document.getElementById('labelObligatorio').classList.add('oculto');
+        document.getElementById('checkDanada').checked = false;
+        document.getElementById('campoObservacion').classList.add('oculto');
+        document.getElementById('devolucionObs').value = "";
+
+        if (!existeEnBD) {
+            document.getElementById('bloqueNoRegistrada').classList.remove('oculto');
+            return;
+        }
+
+        if (tablet.estado === "En Pañol") {
+            document.getElementById('bloqueDespacho').classList.remove('oculto');
+        } else if (tablet.estado === "En Servicio Técnico") {
+            document.getElementById('bloqueServicioTecnico').classList.remove('oculto');
+        } else {
+            // En Uso Local o En Uso Externo
+            document.getElementById('infoPrestamoActual').classList.remove('oculto');
+            document.getElementById('fichaLegajo').innerText = tablet.legajo || "-";
+            document.getElementById('fichaTarea').innerText = tablet.tarea || "Sin tarea especificada";
+            document.getElementById('bloqueDevolucion').classList.remove('oculto');
+        }
+    }
+
+    // --- CU-01: ALTA DE TABLET ---
+    async function registrarAlta() {
+        const datos = {
+            accion: "alta",
+            serie: document.getElementById('altaSerie').value.trim(),
+            cpu: document.getElementById('altaCpu').value.trim(),
+            ram_storage: document.getElementById('altaRam').value.trim(),
+            pantalla: document.getElementById('altaPantalla').value.trim(),
+            puertos: document.getElementById('altaPuertos').value.trim(),
+            conectividad: document.getElementById('altaConectividad').value.trim()
+        };
+
+        if (!datos.serie || !datos.cpu || !datos.ram_storage || !datos.pantalla || !datos.puertos || !datos.conectividad) {
+            mostrarToast("⚠ Completá todos los campos técnicos.", "#dc2626");
+            return;
+        }
+
+        const ok = await enviarAccion(datos);
+        if (ok) {
+            // Generamos el JSON limpio y el código QR visual
+            const jsonQR = JSON.stringify({
+                serie: datos.serie,
+                cpu: datos.cpu,
+                ram_storage: datos.ram_storage,
+                pantalla: datos.pantalla,
+                puertos: datos.puertos,
+                conectividad: datos.conectividad
+            });
+
+            document.getElementById('qrGeneradoBox').classList.remove('oculto');
+            document.getElementById('jsonPreview').innerText = jsonQR;
+            const qrDiv = document.getElementById('qrcode');
+            qrDiv.innerHTML = "";
+            new QRCode(qrDiv, { text: jsonQR, width: 180, height: 180 });
+        }
+    }
+
+    async function altaRapidaDesdeQR() {
+        if (!tabletActual) return;
+        const ok = await enviarAccion({
+            accion: "alta",
+            serie: tabletActual.serie,
+            cpu: tabletActual.cpu,
+            ram_storage: tabletActual.ram_storage,
+            pantalla: tabletActual.pantalla,
+            puertos: tabletActual.puertos,
+            conectividad: tabletActual.conectividad
+        });
+        if (ok && inventarioLocal[tabletActual.serie]) {
+            mostrarFicha(inventarioLocal[tabletActual.serie], true);
+        }
+    }
+
+    // --- CU-02: DESPACHAR TABLET ---
+    function verificarModalidad() {
+        const destino = document.getElementById('despachoDestino').value;
+        const lbl = document.getElementById('labelObligatorio');
+        const alerta = document.getElementById('alertaHomeOffice');
+        if (destino === "En Uso Externo (Home Office)") {
+            lbl.classList.remove('oculto');
+        } else {
+            lbl.classList.add('oculto');
+            alerta.classList.add('oculto');
+        }
+    }
+
+    async function confirmarDespacho() {
+        const legajo = document.getElementById('despachoLegajo').value.trim();
+        const destino = document.getElementById('despachoDestino').value;
+        const tarea = document.getElementById('despachoTarea').value.trim();
+        const alerta = document.getElementById('alertaHomeOffice');
+
+        if (!legajo) {
+            mostrarToast("⚠ Ingresá el legajo del empleado.", "#dc2626");
+            return;
+        }
+
+        // Validación obligatoria: Home Office requiere tarea
+        if (destino === "En Uso Externo (Home Office)" && !tarea) {
+            alerta.classList.remove('oculto');
+            mostrarToast("🚨 Home Office bloqueado: falta tarea asignada.", "#dc2626");
+            return;
+        }
+
+        alerta.classList.add('oculto');
+        const ok = await enviarAccion({
+            accion: "despacho",
+            serie: tabletActual.serie,
+            legajo: legajo,
+            destino: destino,
+            tarea: tarea
+        });
+
+        if (ok && inventarioLocal[tabletActual.serie]) {
+            mostrarFicha(inventarioLocal[tabletActual.serie], true);
+        }
+    }
+
+    // --- CU-03: RECIBIR DEVOLUCIÓN ---
+    function toggleObservacion() {
+        const danada = document.getElementById('checkDanada').checked;
+        document.getElementById('campoObservacion').classList.toggle('oculto', !danada);
+    }
+
+    async function confirmarDevolucion() {
+        const danada = document.getElementById('checkDanada').checked;
+        const obs = document.getElementById('devolucionObs').value.trim();
+
+        const ok = await enviarAccion({
+            accion: "devolucion",
+            serie: tabletActual.serie,
+            danada: danada,
+            observacion: danada ? (obs || "Falla reportada en devolución") : "OK"
+        });
+
+        if (ok && inventarioLocal[tabletActual.serie]) {
+            mostrarFicha(inventarioLocal[tabletActual.serie], true);
+        }
+    }
+
+    // --- EXTRA: REHABILITAR DESDE SERVICIO TÉCNICO ---
+    async function rehabilitarTablet() {
+        const ok = await enviarAccion({
+            accion: "rehabilitar",
+            serie: tabletActual.serie
+        });
+        if (ok && inventarioLocal[tabletActual.serie]) {
+            mostrarFicha(inventarioLocal[tabletActual.serie], true);
+        }
+    }
+
+    // --- RENDERIZAR INVENTARIO ---
+    function renderizarInventario() {
+        const contenedor = document.getElementById('listaInventario');
+        const series = Object.keys(inventarioLocal);
+
+        if (series.length === 0) {
+            contenedor.innerHTML = "<p style='text-align:center; color:#64748b;'>No hay tablets registradas aún. Usá la pestaña 'Alta (CU-01)'.</p>";
+            return;
+        }
+
+        contenedor.innerHTML = series.map(s => {
+            const t = inventarioLocal[s];
+            return `
+                <div class="inv-item" onclick="abrirDesdeInventario('${t.serie}')">
+                    <div class="inv-top">
+                        <strong>${t.serie}</strong>
+                        <span class="badge ${obtenerClaseEstado(t.estado)}" style="font-size:11px; padding:4px 8px;">${t.estado}</span>
+                    </div>
+                    <div class="inv-meta">
+                        ${t.cpu} • ${t.ram_storage} • ${t.pantalla}
+                        ${t.legajo ? `<br>👤 Legajo: <strong>${t.legajo}</strong>` : ""}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function abrirDesdeInventario(serie) {
+        cambiarVista('escaner');
+        document.getElementById('inputSerieManual').value = serie;
+        mostrarFicha(inventarioLocal[serie], true);
+    }
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
+</body>
+</html> 
